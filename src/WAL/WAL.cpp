@@ -82,9 +82,14 @@ std::vector<std::pair<std::string, std::string>> WAL::recover(){
 void WAL::clear(){
     out_stream.close();
 
-    // Reopen with std::ios::trunc to wipe the file contents
-    out_stream.open(log_path, std::ios::trunc | std::ios::binary); 
-}
+    // open with std::ios::trunc to wipe the file contents
+    out_stream.open(log_path, std::ios::out | std::ios::trunc | std::ios::binary);
+    out_stream.close();
 
+    // reopen in append mode to match the original state
+    out_stream.open(log_path, std::ios::app | std::ios::binary); 
+
+    
+}
 
 } // namespace LSM
