@@ -1,26 +1,43 @@
-#include "./WAL/WAL.hpp"
+#include "./KVStore/KVStore.hpp"
 #include <iostream>
 
+void simulateCrash(){
+    std::cout << "\nBOOTING SYSTEM\n";
+
+    LSM::KVStore db("./mydb");
+
+    std::cout << "Inserting Users \n";
+    db.put("user:vallabh", "{\"role\": \"admin\"}");
+    db.put("user:guest", "{\"role\": \"reader\"}");
+
+    auto val = db.get("user:vallabh");
+    if(val) std::cout << "Read before crash: " << val.value() << "\n";
+
+    std::cout << "SYSTEM CRASHING\n";
+
+    // function scope ends, db will be destroyed 
+}
+
+void simulateRecovery(){
+    std::cout << "\nREBOOTING SYSTEM AGAIN\n";
+
+    // a new database pointing to same directory
+    LSM::KVStore db("./mydb");
+    
+    std::cout << "Attempting to read user:vallabh\n";
+    auto val = db.get("user:vallabh");
+    
+    if(val){
+        std::cout << "SUCCESS! Recovered value: " << val.value() << "\n";
+    }
+    else{
+        std::cout << "FAILURE: Data was lost.\n";
+    }
+}
+
 int main(){
-    std::string filepath = "test.wal";
+    simulateCrash();
+    simulateRecovery();
 
-    // write phase
-    {
-        LSM::WAL wal(filepath);
-
-        wal.clear();
-
-        wal.append("user:101", "{\"name\":\"Vallabh\", \"age\":\"22\"}");
-        wal.append("user:101", "{\"name\":\"Saloni\", \"age\":\"26\"}");
-        std::cout << "Data appended to binary WAL\n";
-    }
-
-    // reocvery phase
-    LSM::WAL wal(filepath);
-    auto recovered_data = wal.recover();
-    std::cout << "\n Recovered " << recovered_data.size() << " entries\n";
-    for(const auto &pair : recovered_data){
-        std::cout << "Key: " << pair.first << " | value: " << pair.second << "\n";
-    }
     return 0;
 }
