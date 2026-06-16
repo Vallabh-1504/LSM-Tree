@@ -1,43 +1,35 @@
-#include "./KVStore/KVStore.hpp"
+#include "SkipList.hpp"
+#include "SSTable.hpp"
 #include <iostream>
 
-void simulateCrash(){
-    std::cout << "\nBOOTING SYSTEM\n";
 
-    LSM::KVStore db("./mydb");
+int main() {
+    // 1. Simulate an Active MemTable filling up
+    LSM::SkipList memtable;
+    memtable.put("apple", "A red fruit");
+    memtable.put("zebra", "An animal with stripes");
+    memtable.put("banana", "A yellow fruit");
+    memtable.put("mango", "King of fruits");
 
-    std::cout << "Inserting Users \n";
-    db.put("user:vallabh", "{\"role\": \"admin\"}");
-    db.put("user:guest", "{\"role\": \"reader\"}");
-
-    auto val = db.get("user:vallabh");
-    if(val) std::cout << "Read before crash: " << val.value() << "\n";
-
-    std::cout << "SYSTEM CRASHING\n";
-
-    // function scope ends, db will be destroyed 
-}
-
-void simulateRecovery(){
-    std::cout << "\nREBOOTING SYSTEM AGAIN\n";
-
-    // a new database pointing to same directory
-    LSM::KVStore db("./mydb");
+    // 2. The MemTable is full. Extract sorted data.
+    auto sorted_data = memtable.flushAll();
     
-    std::cout << "Attempting to read user:vallabh\n";
-    auto val = db.get("user:vallabh");
-    
-    if(val){
-        std::cout << "SUCCESS! Recovered value: " << val.value() << "\n";
-    }
-    else{
-        std::cout << "FAILURE: Data was lost.\n";
-    }
-}
+    // 3. Write it to an Immutable SSTable on disk
+    LSM::SSTable sstable("./data_001.sst");
+    sstable.write(sorted_data);
+    std::cout << "Successfully flushed MemTable to data_001.sst\n";
 
-int main(){
-    simulateCrash();
-    simulateRecovery();
+    // 4. Test searching the disk file directly (without RAM)
+    std::cout << "\n--- Searching SSTable ---\n";
+    
+    auto val1 = sstable.search("banana");
+    std::cout << "Search 'banana': " << (val1 ? val1.value() : "Not Found") << "\n";
+
+    auto val2 = sstable.search("zebra");
+    std::cout << "Search 'zebra': " << (val2 ? val2.value() : "Not Found") << "\n";
+
+    auto val3 = sstable.search("grape");
+    std::cout << "Search 'grape': " << (val3 ? val3.value() : "Not Found") << "\n";
 
     return 0;
 }

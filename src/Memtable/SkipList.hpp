@@ -41,6 +41,9 @@ public:
     // debugging
     void print() const;
 
+    // Extracts all elements in sorted order, required by SSTable
+    std::vector<std::pair<std::string, std::string>> flushAll() const;
+
 };
 
 } // namespace LSM

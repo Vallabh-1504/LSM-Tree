@@ -138,4 +138,15 @@ void SkipList::print() const {
     std::cout << "------------------------\n";
 }
 
+std::vector<std::pair<std::string, std::string>> SkipList::flushAll() const {
+    std::vector<std::pair<std::string, std::string>> result;
+    // Level 0 is a standard linked list and contains all elements in soted order
+    SkipListNode* current = head->forward[0]; 
+    while (current != nullptr) {
+        result.emplace_back(current->key, current->value);
+        current = current->forward[0];
+    }
+    return result;
+}
+
 } // namespace LSM
