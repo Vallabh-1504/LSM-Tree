@@ -36,27 +36,14 @@ int main() {
 
     LSM::SSTable sstable("./data_v2.sst");
     sstable.write(sorted_data);
-    std::cout << "Flushed to Block-Indexed SSTable.\n";
+    std::cout << "Flushed to Bloon-Filter Block-Indexed SSTable.\n";
 
     // Cache warmup, dummy search
-    sstable.search("warmup_key"); 
+    measureTime("warmup_key", [&](){ return sstable.search("warmup_key"); }); 
 
     // Testing extreme bounds and middle of the data
     std::cout << "\nTesting Block Indexing\n";
     
-    // auto val1 = sstable.search("key_0000"); 
-    // std::cout << "Search 'key_0000': " << (val1 ? "Found" : "Miss") << "\n";
-
-    // auto val2 = sstable.search("key_1050"); block
-    // std::cout << "Search 'key_1050': " << (val2 ? "Found" : "Miss") << "\n";
-
-    // auto val3 = sstable.search("key_1999"); 
-    // std::cout << "Search 'key_1999': " << (val3 ? "Found" : "Miss") << "\n";
-
-    // auto val4 = sstable.search("key_9999");
-    // std::cout << "Search 'key_9999': " << (val4 ? "Found" : "Miss") << "\n";
-
-
     measureTime("key_0000", [&]() { return sstable.search("key_0000"); }); // Should be in the very first block
     measureTime("key_1050", [&]() { return sstable.search("key_1050"); }); // Should be deep in a middle 
     measureTime("key_1999", [&]() { return sstable.search("key_1999"); }); // Should be in the final block

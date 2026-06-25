@@ -21,7 +21,6 @@ public:
 private:
     std::string file_path;
 
-
     static constexpr size_t BLOCK_SIZE = 4096; // 4KB Blocks
     static constexpr uint64_t MAGIC_NUMBER = 0xDEADBEEFCAFEBABE; // File signature
 
@@ -31,9 +30,11 @@ private:
         uint32_t val_len;
     };
 
+    // footer now needs to track where bloom filter is stored
     struct Footer{
         uint64_t index_offset;
         uint64_t magic_number;
+        uint64_t meta_offest; // offset for bloom filter
     };
     #pragma pack(pop)
 
