@@ -12,6 +12,7 @@ add_executable(lsm_engine
     src/Memtable/SkipList.cpp
     src/SStable/SSTable.cpp
     src/WAL/WAL.cpp
+    src/BloomFilter/BloomFilter.cpp
 )
 
 # Specify where to find header files
@@ -20,6 +21,7 @@ target_include_directories(lsm_engine PRIVATE
     src/Memtable
     src/SStable
     src/WAL
+    src/BloomFilter
 )
 
 # Add a custom target to run the executable after building
