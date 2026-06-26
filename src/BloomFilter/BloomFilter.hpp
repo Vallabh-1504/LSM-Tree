@@ -9,7 +9,11 @@ private:
     std::vector<bool> bits_;
     uint8_t num_hashes_;
 
+    // DEPRECATED: manual FNV-1a hash is untimized which is bringing anomaly in benchmark numbers, because of manual unoptimized loop
     uint64_t hash(const std::string &key, uint8_t seed) const;
+
+    // replacing hash with getHashes- using murmurHash3 by importing third-party vendor
+    void getHashes(const std::string &key, uint64_t &h1, uint64_t &h2) const; 
 
 public:
     // bits_per_key: Higher for fewer false positives (usually 10)

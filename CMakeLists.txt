@@ -13,6 +13,9 @@ add_executable(lsm_engine
     src/SStable/SSTable.cpp
     src/WAL/WAL.cpp
     src/BloomFilter/BloomFilter.cpp
+
+    # vendored dependency
+    vendor/MurmurHash3/MurmurHash3.cpp
 )
 
 # Specify where to find header files
@@ -22,6 +25,8 @@ target_include_directories(lsm_engine PRIVATE
     src/SStable
     src/WAL
     src/BloomFilter
+
+    vendor/MurmurHash3
 )
 
 # Add a custom target to run the executable after building

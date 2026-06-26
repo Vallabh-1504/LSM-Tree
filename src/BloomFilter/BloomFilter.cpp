@@ -1,4 +1,5 @@
 #include "BloomFilter.hpp"
+#include "MurmurHash3.h"
 #include <cmath>
 
 namespace LSM{
@@ -21,21 +22,57 @@ uint64_t BloomFilter::hash(const std::string& key, uint8_t seed) const {
     return h;
 }
 
+// Wrapper around the external API of murmurhash
+void BloomFilter::getHashes(const std::string& key, uint64_t& h1, uint64_t& h2) const {
+    // using MurmurHash3_x64_128 which outputs 128 bits (16 bytes)
+    uint64_t hash_out[2]; 
+    
+    // Arguments: key data, key length, seed (0), output array
+    MurmurHash3_x64_128(key.data(), key.length(), 0, hash_out);
+    
+    h1 = hash_out[0];
+    h2 = hash_out[1];
+}
+
 void BloomFilter::add(const std::string& key) {
-    for (uint8_t i = 0; i < num_hashes_; i++) {
-        uint64_t h = hash(key, i);
-        bits_[h % bits_.size()] = true;
+    // DEPRECATED
+    // for (uint8_t i = 0; i < num_hashes_; i++) {
+    //     uint64_t h = hash(key, i);
+    //     bits_[h % bits_.size()] = true;
+    // }
+
+    uint64_t h1, h2;
+    getHashes(key, h1, h2); // Hash string exactly once
+
+    for(uint8_t i = 0; i < num_hashes_; i++){
+        // Kirsch-Mitzenmacher optimization
+        // h_i(x) = (h_1(x) + i x h_2(x)) (mod m)
+        uint64_t combined_hash = h1 + (i * h2);
+        bits_[combined_hash % bits_.size()] = true;
     }
 }
 
 bool BloomFilter::possiblyExists(const std::string& key) const {
-    for (uint8_t i = 0; i < num_hashes_; i++) {
-        uint64_t h = hash(key, i);
-        if (!bits_[h % bits_.size()]) {
-            return false; // Guaranteed not to exist
+    // DEPREACTED
+    // for (uint8_t i = 0; i < num_hashes_; i++) {
+    //     uint64_t h = hash(key, i);
+    //     if (!bits_[h % bits_.size()]) {
+    //         return false; // Guaranteed not to exist
+    //     }
+    // }
+
+    uint64_t h1, h2;
+    getHashes(key, h1, h2);
+
+    for(uint64_t i = 0; i < num_hashes_; i++){
+        uint64_t combined_hash = h1 + (i * h2);
+        
+        if(!bits_[combined_hash % bits_.size()]){
+            return false;
         }
     }
-    return true; // Might exist
+
+    return true; // Might exists
 }
 
 std::vector<uint8_t> BloomFilter::serialize() const {
