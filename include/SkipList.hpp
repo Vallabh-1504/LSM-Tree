@@ -5,6 +5,8 @@
 #include <vector>
 #include <optional>
 
+#include "DataTypes.hpp" // For FlushedEntry
+
 namespace LSM{
 
 struct SkipListNode{
@@ -17,13 +19,6 @@ struct SkipListNode{
 
     SkipListNode(const std::string &k, const std::string &v, int level, bool tombstone = false) 
         : key(k), value(v), is_tombstone(tombstone), forward(level, nullptr) {}
-};
-
-// Struct to hold data flushed from Memtable to SSTable
-struct FlushedEntry {
-    std::string key;
-    std::string value;
-    bool is_tombstone;
 };
 
 class SkipList{

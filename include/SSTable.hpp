@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "SkipList.hpp" // For FlushedEntry
+#include "DataTypes.hpp" // For FlushedEntry
 
 namespace LSM {
 
