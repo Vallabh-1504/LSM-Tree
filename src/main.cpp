@@ -1,7 +1,10 @@
-#include "SkipList.hpp"
-#include "SSTable.hpp"
 #include <iostream>
 #include <chrono>
+#include <string>
+#include <filesystem>
+
+#include "SkipList.hpp"
+#include "SSTable.hpp"
 
 // Helper macro/function for profiling
 template <typename Func>
@@ -19,6 +22,12 @@ void measureTime(const std::string& keyName, Func&& searchFunc) {
 }
 
 int main() {
+    // directory for data dump it if it doesn't exist.
+    const std::string data_dir = "temp/";
+    if(!std::filesystem::exists(data_dir)){
+        std::filesystem::create_directories(data_dir);
+    }
+
     LSM::SkipList memtable;
     
     // Generate enough data to force the SSTable  to create multiple 4KB blocks.
@@ -39,7 +48,7 @@ int main() {
 
     auto sorted_data = memtable.flushAll();
 
-    LSM::SSTable sstable("./data_v2.sst");
+    LSM::SSTable sstable(data_dir + "data_v2.sst");
     sstable.write(sorted_data);
     std::cout << "Flushed to Bloon-Filter Block-Indexed SSTable.\n";
 

@@ -1,6 +1,7 @@
-#include "SkipList.hpp"
 #include <iostream>
 #include <random>
+
+#include "SkipList.hpp"
 
 namespace LSM {
 

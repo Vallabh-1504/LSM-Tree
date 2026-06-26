@@ -4,8 +4,9 @@
 #include <string>
 #include <memory>
 #include <optional>
-#include "../Memtable/SkipList.hpp"
-#include "../WAL/WAL.hpp"
+
+#include "SkipList.hpp"
+#include "WAL.hpp"
 
 namespace LSM {
 

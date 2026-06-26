@@ -1,6 +1,6 @@
-#include "WAL.hpp"
-
 #include <iostream>
+
+#include "WAL.hpp"
 
 namespace LSM {
 

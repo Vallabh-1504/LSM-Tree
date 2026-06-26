@@ -1,6 +1,7 @@
+#include <cmath>
+
 #include "BloomFilter.hpp"
 #include "MurmurHash3.h"
-#include <cmath>
 
 namespace LSM{
 

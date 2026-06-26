@@ -8,26 +8,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Define the executable and add source files
 add_executable(lsm_engine
     src/main.cpp
-    src/KVStore/KVStore.cpp
-    src/Memtable/SkipList.cpp
-    src/SStable/SSTable.cpp
-    src/WAL/WAL.cpp
-    src/BloomFilter/BloomFilter.cpp
+    src/KVStore.cpp
+    src/SkipList.cpp
+    src/SSTable.cpp
+    src/WAL.cpp
+    src/BloomFilter.cpp
 
     # vendored dependency
     vendor/MurmurHash3/MurmurHash3.cpp
 )
 
 # Specify where to find header files
-target_include_directories(lsm_engine PRIVATE
-    src/KVStore
-    src/Memtable
-    src/SStable
-    src/WAL
-    src/BloomFilter
-
-    vendor/MurmurHash3
-)
+target_include_directories(lsm_engine PRIVATE 
+    include
+    vendor/MurmurHash3)
 
 # Add a custom target to run the executable after building
 add_custom_target(run

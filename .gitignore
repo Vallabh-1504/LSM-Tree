@@ -5,6 +5,7 @@
 *.sst
 
 database/
+temp/
 
 build/
 logs/

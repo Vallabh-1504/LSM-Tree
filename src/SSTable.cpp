@@ -1,8 +1,8 @@
-#include "SSTable.hpp"
-#include "BloomFilter.hpp"
-
 #include <iostream>
 #include <fstream>
+
+#include "SSTable.hpp"
+#include "BloomFilter.hpp"
 
 namespace LSM {
 

@@ -1,6 +1,7 @@
-#include "KVStore.hpp"
 #include <filesystem>
 #include <iostream>
+
+#include "KVStore.hpp"
 
 namespace LSM {
 

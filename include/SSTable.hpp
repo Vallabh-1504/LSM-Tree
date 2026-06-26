@@ -4,7 +4,8 @@
 #include <optional>
 #include <cstdint>
 #include <cstring>
-#include "../Memtable/SkipList.hpp" // For FlushedEntry
+
+#include "SkipList.hpp" // For FlushedEntry
 
 namespace LSM {
 
