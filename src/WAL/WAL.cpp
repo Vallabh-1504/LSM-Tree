@@ -29,10 +29,11 @@ uint32_t WAL::calculateCRC32(const std::string &data) const{
     return crc;
 }
 
-void WAL::append(const std::string& key, const std::string& value){
+void WAL::append(const std::string& key, const std::string& value, RecordType type){
     LogHeader header;
     header.key_len = static_cast<uint16_t>(key.size());
     header.val_len = static_cast<uint32_t>(value.size());
+    header.type = type;
 
     // checksum over combined key and value string
     header.crc32 = calculateCRC32(key + value);
@@ -45,8 +46,8 @@ void WAL::append(const std::string& key, const std::string& value){
     out_stream.flush();
 }
 
-std::vector<std::pair<std::string, std::string>> WAL::recover(){
-    std::vector<std::pair<std::string, std::string>> entries;
+std::vector<WALEntry> WAL::recover(){
+    std::vector<WALEntry> entries;
     std::ifstream in_stream(log_path, std::ios::binary);
     
     if(!in_stream.is_open()){
@@ -73,7 +74,7 @@ std::vector<std::pair<std::string, std::string>> WAL::recover(){
             break;
         }
 
-        entries.emplace_back(key, value);
+        entries.push_back({key, value, header.type});
     }
 
     return entries;

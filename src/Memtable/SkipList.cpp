@@ -5,7 +5,7 @@
 namespace LSM {
 
 SkipList::SkipList(int max_level, float probability) : max_level(max_level), probability(probability), current_level(0){
-    head = new SkipListNode("", "", max_level);
+    head = new SkipListNode("", "", max_level, false);
 }
 
 SkipList::~SkipList(){
@@ -44,13 +44,16 @@ std::optional<std::string> SkipList::get(const std::string &key) const{
     current = current->forward[0];
 
     if(current != nullptr && current->key == key){
-        return current->value;
+        if(current->is_tombstone){
+            return std::nullopt;
+        }
+        return current->value; // Not a tombstone, return value
     }
 
     return std::nullopt;
 }
 
-void SkipList::put(const std::string &key, const std::string &value){
+void SkipList::put(const std::string &key, const std::string &value, bool is_tombstone){
     // Keep track of nodes whose forward pointers need to be updated
     std::vector<SkipListNode*> update(max_level, nullptr);
     SkipListNode* current = head;
@@ -67,6 +70,7 @@ void SkipList::put(const std::string &key, const std::string &value){
     // Case-1: key already exists, overwrite
     if(current != nullptr && current->key == key){
         current->value = value;
+        current->is_tombstone = is_tombstone;
         return;
     }
 
@@ -82,7 +86,7 @@ void SkipList::put(const std::string &key, const std::string &value){
     }
 
     // create new node
-    SkipListNode* new_node = new SkipListNode(key, value, new_level + 1);
+    SkipListNode* new_node = new SkipListNode(key, value, new_level + 1, is_tombstone);
 
     for(int i = 0; i <= new_level; i++){
         new_node->forward[i] = update[i]->forward[i];
@@ -91,35 +95,9 @@ void SkipList::put(const std::string &key, const std::string &value){
 }
 
 void SkipList::remove(const std::string& key){
-    std::vector<SkipListNode*> update(max_level, nullptr);
-    SkipListNode* current = head;
-
-    for(int i = current_level; i >= 0; i--){
-        while(current->forward[i] != nullptr && current->forward[i]->key < key){
-            current = current->forward[i];
-        }
-        update[i] = current;
-    }
-
-    current = current->forward[0];
-
-    // If the node exists, update pointers to bypass it, then delete it.
-    if(current != nullptr && current->key == key){
-        for(int i = 0; i <= current_level; i++){
-            // If at level i, the previous node's forward pointer doesn't point to current, it means we've updated all pointers for levels the node existed in. Break early
-            if(update[i]->forward[i] != current){
-                break;
-            }
-            update[i]->forward[i] = current->forward[i];
-        }
-
-        delete current;
-
-        // Shrink current_level if the deleted node was the only one at the highest levels
-        while(current_level > 0 && head->forward[current_level] == nullptr){
-            current_level--;
-        }
-    }
+    // Instead of deleting, we insert a tombstone node.
+    // The value for a tombstone is irrelevant, so we use an empty string.
+    put(key, "", true);
 }
 
 void SkipList::print() const {
@@ -138,12 +116,12 @@ void SkipList::print() const {
     std::cout << "------------------------\n";
 }
 
-std::vector<std::pair<std::string, std::string>> SkipList::flushAll() const {
-    std::vector<std::pair<std::string, std::string>> result;
+std::vector<FlushedEntry> SkipList::flushAll() const {
+    std::vector<FlushedEntry> result;
     // Level 0 is a standard linked list and contains all elements in soted order
     SkipListNode* current = head->forward[0]; 
     while (current != nullptr) {
-        result.emplace_back(current->key, current->value);
+        result.push_back({current->key, current->value, current->is_tombstone});
         current = current->forward[0];
     }
     return result;

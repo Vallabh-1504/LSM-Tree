@@ -9,18 +9,28 @@
 
 namespace LSM {
 
+enum class RecordType : uint8_t {
+    PUT = 0,
+    DELETE = 1,
+};
+
+struct WALEntry {
+    std::string key;
+    std::string value;
+    RecordType type;
+};
+
 class WAL{
 private:
     std::string log_path;
     std::ofstream out_stream;
 
-    // pragma directive for compiler to tell- 'do not add padding bytes to this struct'
-    // as we want it to be exactly 10 bytes on disk
     #pragma pack(push, 1)
     struct LogHeader{
         uint32_t crc32; // for integrity of key and value
         uint16_t key_len; // how many bytes to read for key
         uint32_t val_len; // how many bytes to read for value
+        RecordType type;
     };
     #pragma pack(pop)
 
@@ -32,10 +42,10 @@ public:
     ~WAL();
 
     // Append to log
-    void append(const std::string& key, const std::string& value);
+    void append(const std::string& key, const std::string& value, RecordType type);
 
     // Read log file from disk to rebuild MemTable on startup
-    std::vector<std::pair<std::string, std::string>> recover();
+    std::vector<WALEntry> recover();
     
     // Clears the log file
     void clear();

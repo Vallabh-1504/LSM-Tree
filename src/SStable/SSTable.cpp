@@ -8,7 +8,7 @@ namespace LSM {
 
 SSTable::SSTable(const std::string &path) : file_path(path){}
 
-void SSTable::write(const std::vector<std::pair<std::string, std::string>> &data){
+void SSTable::write(const std::vector<FlushedEntry> &data){
     // open in binary and trunc ensoures we start in a new file
     std::ofstream out(file_path, std::ios::binary | std::ios::trunc);
     if(!out.is_open()){
@@ -25,18 +25,19 @@ void SSTable::write(const std::vector<std::pair<std::string, std::string>> &data
 
     // 1. BUild data blocks an populate Bloom Filter
     for(size_t i = 0; i < data.size(); i++){
-        const auto &pair = data[i];
+        const auto &entry = data[i];
 
         // Add every key to Bloom Filter as it passes by
-        filter.add(pair.first);
+        filter.add(entry.key);
 
         RecordHeader header;
-        header.key_len = static_cast<uint16_t>(pair.first.size());
-        header.val_len = static_cast<uint32_t>(pair.second.size());
+        header.record_type = entry.is_tombstone ? 1 : 0;
+        header.key_len = static_cast<uint16_t>(entry.key.size());
+        header.val_len = static_cast<uint32_t>(entry.value.size());
 
         std::string record(reinterpret_cast<const char*>(&header), sizeof(RecordHeader));
-        record += pair.first;
-        record += pair.second;
+        record += entry.key;
+        record += entry.value;
 
         // If adding this record exceeds 4KB, flush the current block to disk
         if(!current_block.empty() && current_block.size() + record.size() > BLOCK_SIZE){
@@ -44,7 +45,7 @@ void SSTable::write(const std::vector<std::pair<std::string, std::string>> &data
 
             // The key of the LAST element in this block is used for the index
             // We use i - 1 because i is the current element that triggered the flush
-            index_entries.emplace_back(data[i - 1].first, current_block_offset);
+            index_entries.emplace_back(data[i - 1].key, current_block_offset);
 
             current_block_offset += current_block.size();
             current_block.clear();
@@ -57,7 +58,7 @@ void SSTable::write(const std::vector<std::pair<std::string, std::string>> &data
     if (!current_block.empty()) {
         out.write(current_block.data(), current_block.size());
 
-        index_entries.emplace_back(data.back().first, current_block_offset);
+        index_entries.emplace_back(data.back().key, current_block_offset);
     }
 
     // 2. Write the Meta Block (Bloom Filter)
@@ -192,6 +193,10 @@ std::optional<std::string> SSTable::searchInBlock(const std::string& block_data,
         offset += header.key_len;
 
         if(current_key == target_key){
+            if (header.record_type == 1) { // It's a tombstone
+                return std::nullopt;
+            }
+            // It's a regular value
             return block_data.substr(offset, header.val_len);
         }
 

@@ -23,10 +23,14 @@ void KVStore::recoverFromWAL(){
     auto entries = wal->recover();
     int count = 0;
 
-    for(const auto &pair : entries){
-        // insert directly into the Memtable without calling the KVStore::put()
-        // as we do not want to write back to WAL Again
-        memtable->put(pair.first, pair.second);
+    for(const auto &entry : entries){
+        if (entry.type == RecordType::PUT) {
+            // insert directly into the Memtable without calling the KVStore::put()
+            // as we do not want to write back to WAL Again
+            memtable->put(entry.key, entry.value, false);
+        } else if (entry.type == RecordType::DELETE) {
+            memtable->put(entry.key, "", true); // Insert tombstone
+        }
         count++;
     }
 
@@ -37,10 +41,10 @@ void KVStore::recoverFromWAL(){
 
 void KVStore::put(const std::string &key, const std::string &value){
     // 1. append to disk
-    wal->append(key, value);
+    wal->append(key, value, RecordType::PUT);
 
     // 2. make available in RAM from fast reads
-    memtable->put(key, value);
+    memtable->put(key, value, false);
 }
 
 std::optional<std::string> KVStore::get(const std::string &key) const {
@@ -49,10 +53,9 @@ std::optional<std::string> KVStore::get(const std::string &key) const {
 
 void KVStore::remove(const std::string &key){
     // removal is a special write- tombstone
-    std::string tombstone = "<TOMBSTONE>";
-    wal->append(key, tombstone);
+    wal->append(key, "", RecordType::DELETE);
 
-    // remove from RAM
+    // "remove" from RAM by inserting a tombstone
     memtable->remove(key);
 }
 

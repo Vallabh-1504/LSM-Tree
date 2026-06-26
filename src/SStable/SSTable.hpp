@@ -4,6 +4,7 @@
 #include <optional>
 #include <cstdint>
 #include <cstring>
+#include "../Memtable/SkipList.hpp" // For FlushedEntry
 
 namespace LSM {
 
@@ -13,7 +14,7 @@ public:
     ~SSTable() = default;
 
     // write sorted data to immutable file
-    void write(const std::vector<std::pair<std::string, std::string>> &data);
+    void write(const std::vector<FlushedEntry> &data);
 
     // read the file to find a specific key
     std::optional<std::string> search(const std::string &target_key) const;
@@ -26,6 +27,7 @@ private:
 
     #pragma pack(push, 1)
     struct RecordHeader{
+        uint8_t record_type; // 0 for PUT, 1 for DELETE (tombstone)
         uint16_t key_len;
         uint32_t val_len;
     };
