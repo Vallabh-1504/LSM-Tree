@@ -168,7 +168,7 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
     in.seekg(target_block_offset, std::ios::beg);
     
     // we read up to BLOCK_SIZE + maximum potential spillover, or up to the index offset. But, generally we would store exact block sizes
-    uint64_t bytes_to_read = footer.index_offset - target_block_offset;
+    uint64_t bytes_to_read = footer.meta_offset - target_block_offset; // should be meta_offset and not index_offset
     if(bytes_to_read > BLOCK_SIZE * 2){
         bytes_to_read = BLOCK_SIZE * 2;
     } 
