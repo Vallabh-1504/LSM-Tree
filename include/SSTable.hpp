@@ -37,7 +37,7 @@ private:
     struct Footer{
         uint64_t index_offset;
         uint64_t magic_number;
-        uint64_t meta_offest; // offset for bloom filter
+        uint64_t meta_offset; // offset for bloom filter
     };
     #pragma pack(pop)
 

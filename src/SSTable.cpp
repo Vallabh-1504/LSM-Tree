@@ -87,7 +87,7 @@ void SSTable::write(const std::vector<FlushedEntry> &data){
     Footer footer;
     footer.index_offset = index_offset;
     footer.magic_number = MAGIC_NUMBER;
-    footer.meta_offest = meta_offset; // Recording bloom filter location
+    footer.meta_offset = meta_offset; // Recording bloom filter location
     out.write(reinterpret_cast<const char*>(&footer), sizeof(Footer));
 
     out.close(); // This file is now immutable by convention
@@ -109,7 +109,7 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
     }
 
     // 2. GATEKEEPER: reading bloom filter first, if it say no, exit from here
-    in.seekg(footer.meta_offest, std::ios::beg);
+    in.seekg(footer.meta_offset, std::ios::beg);
     uint32_t filter_size;
     in.read(reinterpret_cast<char*>(&filter_size), sizeof(uint32_t));
 
