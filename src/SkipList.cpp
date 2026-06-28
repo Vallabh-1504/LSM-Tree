@@ -5,7 +5,7 @@
 
 namespace LSM {
 
-SkipList::SkipList(int max_level, float probability) : max_level(max_level), probability(probability), current_level(0){
+SkipList::SkipList(int max_level, float probability) : max_level(max_level), probability(probability), current_level(0), rng_(std::random_device{}()){
     head = new SkipListNode("", "", max_level, false);
 }
 
@@ -20,12 +20,10 @@ SkipList::~SkipList(){
 }
 int SkipList::randomLevel(){
     // Generate a perfect random
-    std::random_device rd;
-    std::mt19937 gen(rd());
     std::uniform_real_distribution<float> dis(0.0f, 1.0f);
 
     int lvl = 0;
-    while(dis(gen) < probability && lvl < max_level - 1){
+    while(dis(rng_) < probability && lvl < max_level - 1){
         lvl++;
     }
     return lvl;

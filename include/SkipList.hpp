@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <random>
 
 #include "DataTypes.hpp" // For FlushedEntry
 
@@ -28,6 +29,7 @@ private:
     int current_level;
     SkipListNode* head;
 
+    std::mt19937 rng_; // seed only once at startup
     // generate random level for a new node
     int randomLevel();
 
