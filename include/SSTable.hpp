@@ -1,3 +1,6 @@
+#ifndef SSTABLE_HPP
+#define SSTABLE_HPP
+
 #include <string>
 #include <vector>
 #include <utility>
@@ -47,3 +50,5 @@ private:
 };
 
 } // namespace LSM
+
+#endif
