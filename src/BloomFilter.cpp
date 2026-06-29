@@ -6,12 +6,22 @@
 namespace LSM{
 
 BloomFilter::BloomFilter(size_t num_elements, int bits_per_key) {
+    // add 0 guard for undefined zero division behavior below
+    if (num_elements == 0) {
+        bits_.resize(64, false);
+        num_hashes_ = 0;
+        return;
+    } 
+
     size_t num_bits = num_elements * bits_per_key;
-    if (num_bits < 64) num_bits = 64; // Minimum size
+    if (num_bits < 64){
+        num_bits = 64; // Minimum size
+    }
     bits_.resize(num_bits, false);
     
     // Formula for optimal number of hashes: (m/n) * ln(2)
-    num_hashes_ = static_cast<uint8_t>(std::round((static_cast<float>(num_bits) / num_elements) * 0.693));
+    num_hashes_ = static_cast<uint8_t>(
+        std::round((static_cast<float>(num_bits) / num_elements) * 0.693));
 }
 
 uint64_t BloomFilter::hash(const std::string& key, uint8_t seed) const {
