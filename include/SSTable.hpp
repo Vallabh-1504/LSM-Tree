@@ -7,6 +7,7 @@
 #include <optional>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 
 #include "DataTypes.hpp" // For FlushedEntry
 #include "BloomFilter.hpp"
@@ -28,6 +29,7 @@ private:
     std::string file_path;
     
     BloomFilter bloom_filter_; // make bloom filter stateful so it lives whole life of SSTable and not reinitialized on every search- which was previous behaviour
+    mutable std::ifstream reader_;
 
     static constexpr size_t BLOCK_SIZE = 4096; // 4KB Blocks
     static constexpr uint64_t MAGIC_NUMBER = 0xDEADBEEFCAFEBABE; // File signature

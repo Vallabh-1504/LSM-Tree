@@ -25,6 +25,9 @@ SSTable::SSTable(const std::string &path) : file_path(path){
 
     in.read(reinterpret_cast<char*>(filter_data.data()), filter_size);
     bloom_filter_.deserialize(filter_data);   // loaded once, done
+
+    // Open the file for reading and keep it open.
+    reader_.open(file_path, std::ios::binary);
 }
 
 void SSTable::write(const std::vector<FlushedEntry> &data){
@@ -114,15 +117,17 @@ void SSTable::write(const std::vector<FlushedEntry> &data){
 }
 
 std::optional<std::string> SSTable::search(const std::string &target_key) const {
-    std::ifstream in(file_path, std::ios::binary);
-    if(!in.is_open()){
+    // Clear any error flags (like EOF) from previous reads.
+    reader_.clear();
+
+    if(!reader_.is_open()){
         return std::nullopt;
     }
 
     // 1. Read the Footer
-    in.seekg(-static_cast<int>(sizeof(Footer)), std::ios::end);
+    reader_.seekg(-static_cast<int>(sizeof(Footer)), std::ios::end);
     Footer footer;
-    in.read(reinterpret_cast<char*>(&footer), sizeof(Footer));
+    reader_.read(reinterpret_cast<char*>(&footer), sizeof(Footer));
 
     if(footer.magic_number != MAGIC_NUMBER){
         return std::nullopt;
@@ -135,13 +140,13 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
 
     // 3. Read the Index Block
     uint64_t index_size = (std::streamoff)footer.magic_number; // We calculate size by offsets
-    in.seekg(0, std::ios::end);
-    uint64_t file_size = in.tellg();
+    reader_.seekg(0, std::ios::end);
+    uint64_t file_size = reader_.tellg();
     index_size = file_size - footer.index_offset - sizeof(Footer);
 
-    in.seekg(footer.index_offset, std::ios::beg);
+    reader_.seekg(footer.index_offset, std::ios::beg);
     std::string index_data(index_size, '\0');
-    in.read(&index_data[0], index_size);
+    reader_.read(&index_data[0], index_size);
 
     // 3. Search the Index Block in RAM to find the correct Data Block offset
     size_t idx_offset = 0;
@@ -174,7 +179,7 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
     }
 
     // 4. Determine block size and read ONLY that specific Data Block from disk
-    in.seekg(target_block_offset, std::ios::beg);
+    reader_.seekg(target_block_offset, std::ios::beg);
     
     // we read up to BLOCK_SIZE + maximum potential spillover, or up to the index offset. But, generally we would store exact block sizes
     uint64_t bytes_to_read = footer.meta_offset - target_block_offset; // should be meta_offset and not index_offset
@@ -183,9 +188,9 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
     } 
 
     std::string block_data(bytes_to_read, '\0');
-    in.read(&block_data[0], bytes_to_read);
+    reader_.read(&block_data[0], bytes_to_read);
 
-    block_data.resize(static_cast<size_t>(in.gcount())); //trim to acutal bytes
+    block_data.resize(static_cast<size_t>(reader_.gcount())); //trim to acutal bytes
 
     // 5. Search the specific block in RAM
     return searchInBlock(block_data, target_key);
