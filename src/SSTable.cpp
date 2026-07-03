@@ -6,7 +6,26 @@
 
 namespace LSM {
 
-SSTable::SSTable(const std::string &path) : file_path(path){}
+SSTable::SSTable(const std::string &path) : file_path(path){
+    std::ifstream in(file_path, std::ios::binary);
+    if (!in.is_open()){
+        return;   // brand new file, nothing to load yet
+    }
+
+    in.seekg(-static_cast<int>(sizeof(Footer)), std::ios::end);
+    Footer footer;
+    in.read(reinterpret_cast<char*>(&footer), sizeof(Footer));
+    if (footer.magic_number != MAGIC_NUMBER) return;
+
+    in.seekg(footer.meta_offset, std::ios::beg);
+
+    uint32_t filter_size;
+    in.read(reinterpret_cast<char*>(&filter_size), sizeof(uint32_t));
+    std::vector<uint8_t> filter_data(filter_size);
+
+    in.read(reinterpret_cast<char*>(filter_data.data()), filter_size);
+    bloom_filter_.deserialize(filter_data);   // loaded once, done
+}
 
 void SSTable::write(const std::vector<FlushedEntry> &data){
     // open in binary and trunc ensoures we start in a new file
@@ -90,6 +109,7 @@ void SSTable::write(const std::vector<FlushedEntry> &data){
     footer.meta_offset = meta_offset; // Recording bloom filter location
     out.write(reinterpret_cast<const char*>(&footer), sizeof(Footer));
 
+    bloom_filter_ = std::move(filter);
     out.close(); // This file is now immutable by convention
 }
 
@@ -109,18 +129,7 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
     }
 
     // 2. GATEKEEPER: reading bloom filter first, if it say no, exit from here
-    in.seekg(footer.meta_offset, std::ios::beg);
-    uint32_t filter_size;
-    in.read(reinterpret_cast<char*>(&filter_size), sizeof(uint32_t));
-
-    std::vector<uint8_t> filter_data(filter_size);
-    in.read(reinterpret_cast<char*>(filter_data.data()), filter_size);
-
-    BloomFilter filter(0); // Create empty filter
-    filter.deserialize(filter_data); // Load state from disk
-
-    if(!filter.possiblyExists(target_key)){
-        // std::cout << "[Bloom Filter]: Key '" << target_key << "' definitely NOT in file. Skipping disk search.\n";
+    if(!bloom_filter_.possiblyExists(target_key)){
         return std::nullopt;
     }
 

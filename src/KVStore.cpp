@@ -49,7 +49,21 @@ void KVStore::put(const std::string &key, const std::string &value){
 }
 
 std::optional<std::string> KVStore::get(const std::string &key) const {
-    return memtable->get(key);
+    // 1. Check in memtable
+    auto result = memtable->get(key);
+    if(result.has_value()){
+        return result;
+    }
+
+    // 2. Go in SSTables from newest to oldest
+    for(auto it = sstables_.rbegin(); it != sstables_.rend(); it++){
+        result = it->search(key);
+        if(result.has_value()){
+            return result;
+        }
+    }
+
+    return std::nullopt;
 }
 
 void KVStore::remove(const std::string &key){

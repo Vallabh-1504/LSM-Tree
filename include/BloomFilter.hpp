@@ -1,3 +1,6 @@
+#ifndef BLOOMFILTER_HPP
+#define BLOOMFILTER_HPP
+
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -16,6 +19,8 @@ private:
     void getHashes(const std::string &key, uint64_t &h1, uint64_t &h2) const; 
 
 public:
+    BloomFilter() : num_hashes_(0) {}
+
     // bits_per_key: Higher for fewer false positives (usually 10)
     explicit BloomFilter(size_t num_elements, int bits_per_key = 10);
     
@@ -28,3 +33,5 @@ public:
 };
 
 } // Namespace LSM
+
+#endif

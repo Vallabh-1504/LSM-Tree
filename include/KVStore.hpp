@@ -7,6 +7,7 @@
 
 #include "SkipList.hpp"
 #include "WAL.hpp"
+#include "SSTable.hpp"
 
 namespace LSM {
 
@@ -27,6 +28,7 @@ private:
     std::string db_directory;
     std::unique_ptr<WAL> wal;
     std::unique_ptr<SkipList> memtable;
+    std::vector<SSTable> sstables_; // one entry per flushed file    
 
     // helper to restore on startup
     void recoverFromWAL();
