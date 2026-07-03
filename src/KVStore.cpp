@@ -105,6 +105,9 @@ void KVStore::flushMemtable() {
         return; // Nothing to flush
     }
 
+    // 0. Sync the WAL to ensure all records are on disk before we rely on them for recovery.
+    wal->sync();
+
     // 1. Create a new SSTable file path
     // Using a timestamp ensures unique, chronologically sortable filenames.
     auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(

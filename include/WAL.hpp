@@ -49,6 +49,9 @@ public:
     
     // Clears the log file
     void clear();
+    
+    // Sync the WAL file with Memtable periodically (Batch Writing)
+    void sync() { out_stream.flush(); }
 };
 
 }

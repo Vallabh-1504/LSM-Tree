@@ -42,8 +42,6 @@ void WAL::append(const std::string& key, const std::string& value, RecordType ty
     out_stream.write(reinterpret_cast<const char*>(&header), sizeof(LogHeader));
     out_stream.write(key.data(), key.size());
     out_stream.write(value.data(), value.size());
-
-    out_stream.flush();
 }
 
 std::vector<WALEntry> WAL::recover(){
