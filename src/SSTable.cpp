@@ -185,6 +185,8 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
     std::string block_data(bytes_to_read, '\0');
     in.read(&block_data[0], bytes_to_read);
 
+    block_data.resize(static_cast<size_t>(in.gcount())); //trim to acutal bytes
+
     // 5. Search the specific block in RAM
     return searchInBlock(block_data, target_key);
 }
