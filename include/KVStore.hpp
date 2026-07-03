@@ -29,9 +29,13 @@ private:
     std::unique_ptr<WAL> wal;
     std::unique_ptr<SkipList> memtable;
     std::vector<SSTable> sstables_; // one entry per flushed file    
+    size_t memtable_threshold_ = 4096; // Flush after this many items
 
     // helper to restore on startup
     void recoverFromWAL();
+
+    // helper to flush memtable to disk
+    void flushMemtable();
 
 };
 

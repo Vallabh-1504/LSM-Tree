@@ -1,5 +1,9 @@
 #include <filesystem>
+#include <string>
+#include <vector>
 #include <iostream>
+#include <algorithm>
+#include <chrono>
 
 #include "KVStore.hpp"
 
@@ -11,12 +15,29 @@ KVStore::KVStore(const std::string &directory) : db_directory(directory){
         std::filesystem::create_directories(db_directory);
     }
 
-    // 2. initial WAL and Memtable
+    // 2. Scan for existing SSTables and load them
+    std::vector<std::string> sstable_paths;
+    for (const auto& entry : std::filesystem::directory_iterator(db_directory)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".sst") {
+            sstable_paths.push_back(entry.path().string());
+        }
+    }
+    // Sort paths alphabetically to load them in creation order (assuming timestamp-based names)
+    std::sort(sstable_paths.begin(), sstable_paths.end());
+    for (const auto& path : sstable_paths) {
+        sstables_.emplace_back(path);
+    }
+    if (!sstable_paths.empty()) {
+        std::cout << "Loaded " << sstable_paths.size() << " SSTables from disk.\n";
+    }
+
+
+    // 3. initial WAL and Memtable
     std::string wal_path = db_directory + "/LSM.wal";
     wal = std::make_unique<WAL>(wal_path);
     memtable = std::make_unique<SkipList>();
 
-    // 3. rebuild in-memory state from disk Log
+    // 4. rebuild in-memory state from disk Log
     recoverFromWAL();
 }
 
@@ -46,6 +67,11 @@ void KVStore::put(const std::string &key, const std::string &value){
 
     // 2. make available in RAM from fast reads
     memtable->put(key, value, false);
+
+    // 3. Check if memtable is full and needs to be flushed
+    if (memtable->size() >= memtable_threshold_) {
+        flushMemtable();
+    }
 }
 
 std::optional<std::string> KVStore::get(const std::string &key) const {
@@ -72,6 +98,28 @@ void KVStore::remove(const std::string &key){
 
     // "remove" from RAM by inserting a tombstone
     memtable->remove(key);
+}
+
+void KVStore::flushMemtable() {
+    if (memtable->size() == 0) {
+        return; // Nothing to flush
+    }
+
+    // 1. Create a new SSTable file path
+    // Using a timestamp ensures unique, chronologically sortable filenames.
+    auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string sstable_path = db_directory + "/sstable_" + std::to_string(timestamp) + ".sst";
+
+    // 2. Write memtable data to the new SSTable
+    SSTable new_sstable(sstable_path);
+    new_sstable.write(memtable->flushAll());
+    sstables_.push_back(std::move(new_sstable));
+
+    // 3. Atomically clear the WAL and reset the memtable.
+    // This is the critical step to prevent the WAL from growing forever.
+    wal->clear();
+    memtable = std::make_unique<SkipList>();
 }
 
 } // namespace LSM

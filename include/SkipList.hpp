@@ -28,6 +28,7 @@ private:
     float probability;
     int current_level;
     SkipListNode* head;
+    size_t size_ = 0; // Track number of elements
 
     std::mt19937 rng_; // seed only once at startup
     // generate random level for a new node
@@ -49,6 +50,9 @@ public:
 
     // Extracts all elements in sorted order, required by SSTable
     std::vector<FlushedEntry> flushAll() const;
+
+    // Get current size
+    size_t size() const { return size_; }
 
 };
 

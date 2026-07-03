@@ -70,6 +70,7 @@ void SkipList::put(const std::string &key, const std::string &value, bool is_tom
     if(current != nullptr && current->key == key){
         current->value = value;
         current->is_tombstone = is_tombstone;
+        // Not a new element, so size_ does not change
         return;
     }
 
@@ -91,6 +92,7 @@ void SkipList::put(const std::string &key, const std::string &value, bool is_tom
         new_node->forward[i] = update[i]->forward[i];
         update[i]->forward[i] = new_node;
     }
+    size_++;
 }
 
 void SkipList::remove(const std::string& key){
