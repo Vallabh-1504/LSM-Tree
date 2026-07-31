@@ -8,6 +8,7 @@ database/
 temp/
 
 build/
+build_bench/
 logs/
 
 

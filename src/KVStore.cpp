@@ -25,7 +25,7 @@ KVStore::KVStore(const std::string &directory) : db_directory(directory){
     // Sort paths alphabetically to load them in creation order (assuming timestamp-based names)
     std::sort(sstable_paths.begin(), sstable_paths.end());
     for (const auto& path : sstable_paths) {
-        sstables_.emplace_back(path);
+        sstables_.push_back(std::make_unique<SSTable>(path));
     }
     if (!sstable_paths.empty()) {
         std::cout << "Loaded " << sstable_paths.size() << " SSTables from disk.\n";
@@ -83,7 +83,7 @@ std::optional<std::string> KVStore::get(const std::string &key) const {
 
     // 2. Go in SSTables from newest to oldest
     for(auto it = sstables_.rbegin(); it != sstables_.rend(); it++){
-        result = it->search(key);
+        result = (*it)->search(key);
         if(result.has_value()){
             return result;
         }
@@ -115,8 +115,8 @@ void KVStore::flushMemtable() {
     std::string sstable_path = db_directory + "/sstable_" + std::to_string(timestamp) + ".sst";
 
     // 2. Write memtable data to the new SSTable
-    SSTable new_sstable(sstable_path);
-    new_sstable.write(memtable->flushAll());
+    auto new_sstable = std::make_unique<SSTable>(sstable_path);
+    new_sstable->write(memtable->flushAll());
     sstables_.push_back(std::move(new_sstable));
 
     // 3. Atomically clear the WAL and reset the memtable.
