@@ -327,4 +327,141 @@ BENCHMARK_DEFINE_F(KVStoreFixture, Flush)(benchmark::State& state) {
 }
 BENCHMARK_REGISTER_F(KVStoreFixture, Flush);
 
+// ─── KVStore: SSTable cold-path get ──────────────────────────────────────────
+//
+// Fill past the flush threshold so all data is on disk, then read it back.
+// This measures the full cold get() path:
+//   bloom filter check → SSTable index scan → block I/O → value decode.
+// This is the most important get-latency number for an LSM engine and is
+// absent from the memtable-only BM_KVStore_Get_Memtable_Hit above.
+//
+// Expected: significantly higher latency than the memtable hit (~10-100× slower)
+// because every lookup must read from disk and navigate the SSTable index.
+
+BENCHMARK_DEFINE_F(KVStoreFixture, Get_SSTable_Hit)(benchmark::State& state) {
+    // Flush threshold matches KVStore.hpp private member.
+    const size_t threshold = 4096;
+
+    // Insert enough keys to guarantee at least one full flush to disk.
+    // Keys 0..threshold-1 will end up in an SSTable; subsequent puts stay
+    // in the memtable — we only query the flushed range.
+    for (size_t i = 0; i < threshold + 100; ++i)
+        store_->put(makeKey(i), makeValue(i));
+
+    int i = 0;
+    for (auto _ : state) {
+        // Always query a key that was flushed (well within [0, threshold)).
+        benchmark::DoNotOptimize(store_->get(makeKey(i % static_cast<int>(threshold))));
+        i++;
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK_REGISTER_F(KVStoreFixture, Get_SSTable_Hit);
+
+// ─── WAL sync isolation ───────────────────────────────────────────────────────
+//
+// Measures WAL::sync() (i.e. fstream::flush()) in isolation.
+// This is one of the three costs paid inside KVStore::flushMemtable(), and
+// isolating it lets us attribute flush latency between WAL sync, SSTable write,
+// and memtable reset.
+//
+// Expected: single-digit microseconds (a syscall + kernel buffer drain).
+
+BENCHMARK_DEFINE_F(WALFixture, Sync)(benchmark::State& state) {
+    // Pre-write some data so there is actually something to sync.
+    for (int i = 0; i < 100; ++i)
+        wal_->append(makeKey(i), makeValue(i), LSM::RecordType::PUT);
+
+    for (auto _ : state) {
+        wal_->sync();
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK_REGISTER_F(WALFixture, Sync);
+
+// ─── Mixed read/write workload ────────────────────────────────────────────────
+//
+// 80% reads / 20% writes — approximates a realistic YCSB "B" workload.
+// All reads target keys that are guaranteed to be present in the memtable,
+// so this measures the hot-path mix without SSTable I/O noise.
+//
+// This is the headline throughput number for résumé/report use because it
+// reflects actual application behaviour rather than isolated micro-ops.
+
+BENCHMARK_DEFINE_F(KVStoreFixture, Mixed_ReadHeavy)(benchmark::State& state) {
+    // Seed the store with enough data to make reads meaningful.
+    const int seed = 2000;
+    for (int i = 0; i < seed; ++i) store_->put(makeKey(i), makeValue(i));
+
+    int i = 0;
+    for (auto _ : state) {
+        if (i % 5 == 0) {                                      // 20 % writes
+            store_->put(makeKey(seed + i), makeValue(seed + i));
+        } else {                                               // 80 % reads
+            benchmark::DoNotOptimize(store_->get(makeKey(i % seed)));
+        }
+        i++;
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK_REGISTER_F(KVStoreFixture, Mixed_ReadHeavy);
+
+// ─── Throughput across value sizes (MB/s) ────────────────────────────────────
+//
+// Parameterised by value size so the output includes MB/s via SetBytesProcessed.
+// Range(0) = number of keys, Range(1) = value size in bytes.
+//
+// Résumé metric: "write throughput peaks at X MB/s for 1 KB values".
+// Without SetBytesProcessed, Google Benchmark only reports ops/sec; this
+// section adds the byte-level accounting needed for MB/s figures.
+
+static std::string makeValueSized(int i, int size) {
+    return std::string(static_cast<size_t>(size), 'A' + (i % 26));
+}
+
+static void BM_SkipList_Put_Throughput(benchmark::State& state) {
+    const int n    = static_cast<int>(state.range(0));
+    const int vlen = static_cast<int>(state.range(1));
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        LSM::SkipList sl;
+        state.ResumeTiming();
+
+        for (int i = 0; i < n; i++)
+            sl.put(makeKey(i), makeValueSized(i, vlen));
+    }
+
+    // key (~12 bytes) + value so Google Benchmark shows MB/s automatically.
+    state.SetBytesProcessed(state.iterations() *
+                            static_cast<int64_t>(n) * (12 + vlen));
+    state.SetItemsProcessed(state.iterations() * n);
+}
+// 1 000 keys × {50, 256, 1024} bytes — shows how throughput scales with payload.
+BENCHMARK(BM_SkipList_Put_Throughput)
+    ->ArgsProduct({{1000, 5000}, {50, 256, 1024}});
+
+static void BM_KVStore_Put_Throughput(benchmark::State& state) {
+    const int vlen = static_cast<int>(state.range(0));
+    const std::string dir =
+        (std::filesystem::temp_directory_path() / "bench_kvstore_tp").string();
+    std::filesystem::remove_all(dir);
+    LSM::KVStore store(dir);
+
+    int i = 0;
+    for (auto _ : state) {
+        store.put(makeKey(i), makeValueSized(i, vlen));
+        i++;
+    }
+
+    // key + value bytes for MB/s reporting.
+    state.SetBytesProcessed(state.iterations() *
+                            static_cast<int64_t>(12 + vlen));
+    state.SetItemsProcessed(state.iterations());
+    std::filesystem::remove_all(dir);
+}
+// Vary value size; ops/sec AND MB/s will appear in benchmark output.
+BENCHMARK(BM_KVStore_Put_Throughput)->Arg(50)->Arg(256)->Arg(1024);
+
 BENCHMARK_MAIN();
