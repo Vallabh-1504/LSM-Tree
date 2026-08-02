@@ -102,19 +102,19 @@ void SkipList::remove(const std::string& key){
 }
 
 void SkipList::print() const {
-    std::cout << "\n--- Skip List Contents --\n";
+    // std::cout << "\n--- Skip List Contents --\n";
 
     for(int i = current_level; i >= 0; i--){
         SkipListNode* current = head->forward[i];
-        std::cout << "Level " << i << ": ";
+        // std::cout << "Level " << i << ": ";
 
         while(current != nullptr){
-            std::cout << "[" << current->key << ":" << current->value << "] ";
+            // std::cout << "[" << current->key << ":" << current->value << "] ";
             current = current->forward[i];
         }
-        std::cout << "\n";
+        // std::cout << "\n";
     }
-    std::cout << "------------------------\n";
+    // std::cout << "------------------------\n";
 }
 
 std::vector<FlushedEntry> SkipList::flushAll() const {

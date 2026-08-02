@@ -28,7 +28,7 @@ KVStore::KVStore(const std::string &directory) : db_directory(directory){
         sstables_.push_back(std::make_unique<SSTable>(path));
     }
     if (!sstable_paths.empty()) {
-        std::cout << "Loaded " << sstable_paths.size() << " SSTables from disk.\n";
+        // std::cout << "Loaded " << sstable_paths.size() << " SSTables from disk.\n";
     }
 
 
@@ -50,14 +50,15 @@ void KVStore::recoverFromWAL(){
             // insert directly into the Memtable without calling the KVStore::put()
             // as we do not want to write back to WAL Again
             memtable->put(entry.key, entry.value, false);
-        } else if (entry.type == RecordType::DELETE) {
+        } 
+        else if (entry.type == RecordType::DELETE) {
             memtable->put(entry.key, "", true); // Insert tombstone
         }
         count++;
     }
 
     if(count > 0){
-        std::cout << "successfully recovered " << count << " keys from WAL\n"; 
+        // std::cout << "successfully recovered " << count << " keys from WAL\n"; 
     }
 }
 
