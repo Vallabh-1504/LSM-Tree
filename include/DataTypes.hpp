@@ -5,6 +5,11 @@
 
 namespace LSM {
 
+enum class RecordType : uint8_t {
+    PUT = 0,
+    DELETE = 1,
+};
+
 // Struct to hold data flushed from Memtable to SSTable
 struct FlushedEntry {
     std::string key;

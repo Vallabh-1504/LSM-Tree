@@ -42,7 +42,8 @@ void SSTable::write(const std::vector<FlushedEntry> &data){
     LSM::BloomFilter filter(data.size());
 
     std::string current_block;
-    std::vector<std::pair<std::string, uint64_t>> index_entries;
+    // Store: last_key, block_start_offset, block_size
+    std::vector<std::tuple<std::string, uint64_t, uint32_t>> index_entries;
     uint64_t current_block_offset = 0;
 
     // 1. BUild data blocks an populate Bloom Filter
@@ -53,7 +54,7 @@ void SSTable::write(const std::vector<FlushedEntry> &data){
         filter.add(entry.key);
 
         RecordHeader header;
-        header.record_type = entry.is_tombstone ? 1 : 0;
+        header.record_type = entry.is_tombstone ? RecordType::DELETE : RecordType::PUT;
         header.key_len = static_cast<uint16_t>(entry.key.size());
         header.val_len = static_cast<uint32_t>(entry.value.size());
 
@@ -67,7 +68,7 @@ void SSTable::write(const std::vector<FlushedEntry> &data){
 
             // The key of the LAST element in this block is used for the index
             // We use i - 1 because i is the current element that triggered the flush
-            index_entries.emplace_back(data[i - 1].key, current_block_offset);
+            index_entries.emplace_back(data[i - 1].key, current_block_offset, static_cast<uint32_t>(current_block.size()));
 
             current_block_offset += current_block.size();
             current_block.clear();
@@ -80,7 +81,7 @@ void SSTable::write(const std::vector<FlushedEntry> &data){
     if (!current_block.empty()) {
         out.write(current_block.data(), current_block.size());
 
-        index_entries.emplace_back(data.back().key, current_block_offset);
+        index_entries.emplace_back(data.back().key, current_block_offset, static_cast<uint32_t>(current_block.size()));
     }
 
     // 2. Write the Meta Block (Bloom Filter)
@@ -97,12 +98,13 @@ void SSTable::write(const std::vector<FlushedEntry> &data){
 
     // Build and Write the Index Block
     for (size_t i = 0; i < index_entries.size(); i++) {
-        const auto& entry = index_entries[i];
-        uint16_t key_len = static_cast<uint16_t>(entry.first.size());
+        const auto& [key, offset, size] = index_entries[i];
+        uint16_t key_len = static_cast<uint16_t>(key.size());
         
         out.write(reinterpret_cast<const char*>(&key_len), sizeof(uint16_t));
-        out.write(entry.first.data(), entry.first.size());
-        out.write(reinterpret_cast<const char*>(&entry.second), sizeof(uint64_t));
+        out.write(key.data(), key.size());
+        out.write(reinterpret_cast<const char*>(&offset), sizeof(uint64_t));
+        out.write(reinterpret_cast<const char*>(&size), sizeof(uint32_t));
     }
 
     // Write the Footer
@@ -138,19 +140,19 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
         return std::nullopt;
     }
 
-    // 3. Read the Index Block
-    uint64_t index_size = (std::streamoff)footer.magic_number; // We calculate size by offsets
+    // 3. Calculate index size and read the Index Block from disk into memory
     reader_.seekg(0, std::ios::end);
     uint64_t file_size = reader_.tellg();
-    index_size = file_size - footer.index_offset - sizeof(Footer);
+    uint64_t index_size = (file_size - sizeof(Footer)) - footer.index_offset;
 
     reader_.seekg(footer.index_offset, std::ios::beg);
     std::string index_data(index_size, '\0');
     reader_.read(&index_data[0], index_size);
 
-    // 3. Search the Index Block in RAM to find the correct Data Block offset
+    // 4. Search the in-memory Index Block to find the correct Data Block offset
     size_t idx_offset = 0;
     uint64_t target_block_offset = 0;
+    uint32_t target_block_size = 0;
     bool block_found = false;
 
     while(idx_offset < index_size){
@@ -165,10 +167,15 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
         std::memcpy(&block_offset, index_data.data() + idx_offset, sizeof(uint64_t));
         idx_offset += sizeof(uint64_t);
 
+        uint32_t block_size;
+        std::memcpy(&block_size, index_data.data() + idx_offset, sizeof(uint32_t));
+        idx_offset += sizeof(uint32_t);
+
         // If the target_key is less than or equal to the last key in this block,
         // then the target MUST be in this block (if it exists at all).
         if (target_key <= index_key) {
             target_block_offset = block_offset;
+            target_block_size = block_size;
             block_found = true;
             break;
         }
@@ -178,21 +185,14 @@ std::optional<std::string> SSTable::search(const std::string &target_key) const 
         return std::nullopt;
     }
 
-    // 4. Determine block size and read ONLY that specific Data Block from disk
+    // 5. Read ONLY the target Data Block from disk
+    std::string block_data(target_block_size, '\0');
     reader_.seekg(target_block_offset, std::ios::beg);
-    
-    // we read up to BLOCK_SIZE + maximum potential spillover, or up to the index offset. But, generally we would store exact block sizes
-    uint64_t bytes_to_read = footer.meta_offset - target_block_offset; // should be meta_offset and not index_offset
-    if(bytes_to_read > BLOCK_SIZE * 2){
-        bytes_to_read = BLOCK_SIZE * 2;
-    } 
-
-    std::string block_data(bytes_to_read, '\0');
-    reader_.read(&block_data[0], bytes_to_read);
+    reader_.read(&block_data[0], target_block_size);
 
     block_data.resize(static_cast<size_t>(reader_.gcount())); //trim to acutal bytes
 
-    // 5. Search the specific block in RAM
+    // 6. Search the specific block (now in RAM) for the key
     return searchInBlock(block_data, target_key);
 }
 
@@ -209,7 +209,7 @@ std::optional<std::string> SSTable::searchInBlock(const std::string& block_data,
         offset += header.key_len;
 
         if(current_key == target_key){
-            if (header.record_type == 1) { // It's a tombstone
+            if (header.record_type == RecordType::DELETE) { // It's a tombstone
                 return std::nullopt;
             }
             // It's a regular value

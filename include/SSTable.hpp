@@ -9,7 +9,7 @@
 #include <cstring>
 #include <fstream>
 
-#include "DataTypes.hpp" // For FlushedEntry
+#include "DataTypes.hpp" // For FlushedEntry and RecordType
 #include "BloomFilter.hpp"
 
 namespace LSM {
@@ -36,7 +36,7 @@ private:
 
     #pragma pack(push, 1)
     struct RecordHeader{
-        uint8_t record_type; // 0 for PUT, 1 for DELETE (tombstone)
+        RecordType record_type;
         uint16_t key_len;
         uint32_t val_len;
     };

@@ -6,13 +6,9 @@
 #include <vector>
 #include <utility>
 #include <cstdint> // for fix-width integer types (unint32_t)
+#include "DataTypes.hpp"
 
 namespace LSM {
-
-enum class RecordType : uint8_t {
-    PUT = 0,
-    DELETE = 1,
-};
 
 struct WALEntry {
     std::string key;
