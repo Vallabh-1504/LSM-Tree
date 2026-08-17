@@ -9,7 +9,7 @@ namespace LSM{
 
 class BloomFilter {
 private:
-    std::vector<bool> bits_;
+    std::vector<uint8_t> bits_;
     uint8_t num_hashes_;
 
     // DEPRECATED: manual FNV-1a hash is untimized which is bringing anomaly in benchmark numbers, because of manual unoptimized loop

@@ -8,7 +8,7 @@ namespace LSM{
 BloomFilter::BloomFilter(size_t num_elements, int bits_per_key) {
     // add 0 guard for undefined zero division behavior below
     if (num_elements == 0) {
-        bits_.resize(64, false);
+        bits_.resize(8, 0); // 64 bits
         num_hashes_ = 0;
         return;
     } 
@@ -17,11 +17,12 @@ BloomFilter::BloomFilter(size_t num_elements, int bits_per_key) {
     if (num_bits < 64){
         num_bits = 64; // Minimum size
     }
-    bits_.resize(num_bits, false);
+    // Round up to the nearest byte
+    bits_.resize((num_bits + 7) / 8, 0);
     
     // Formula for optimal number of hashes: (m/n) * ln(2)
     num_hashes_ = static_cast<uint8_t>(
-        std::round((static_cast<float>(num_bits) / num_elements) * 0.693));
+        std::round((static_cast<float>(bits_.size() * 8) / num_elements) * 0.693));
 }
 
 uint64_t BloomFilter::hash(const std::string& key, uint8_t seed) const {
@@ -46,60 +47,43 @@ void BloomFilter::getHashes(const std::string& key, uint64_t& h1, uint64_t& h2) 
 }
 
 void BloomFilter::add(const std::string& key) {
-    // DEPRECATED
-    // for (uint8_t i = 0; i < num_hashes_; i++) {
-    //     uint64_t h = hash(key, i);
-    //     bits_[h % bits_.size()] = true;
-    // }
-
     uint64_t h1, h2;
     getHashes(key, h1, h2); // Hash string exactly once
+    size_t num_bits = bits_.size() * 8;
 
     for(uint8_t i = 0; i < num_hashes_; i++){
         // Kirsch-Mitzenmacher optimization
         // h_i(x) = (h_1(x) + i x h_2(x)) (mod m)
         uint64_t combined_hash = h1 + (i * h2);
-        bits_[combined_hash % bits_.size()] = true;
+        size_t bit_pos = combined_hash % num_bits;
+        bits_[bit_pos / 8] |= (1 << (bit_pos % 8));
     }
 }
 
 bool BloomFilter::possiblyExists(const std::string& key) const {
-    // DEPREACTED
-    // for (uint8_t i = 0; i < num_hashes_; i++) {
-    //     uint64_t h = hash(key, i);
-    //     if (!bits_[h % bits_.size()]) {
-    //         return false; // Guaranteed not to exist
-    //     }
-    // }
-
     uint64_t h1, h2;
     getHashes(key, h1, h2);
+    size_t num_bits = bits_.size() * 8;
 
     for(uint64_t i = 0; i < num_hashes_; i++){
         uint64_t combined_hash = h1 + (i * h2);
-        
-        if(!bits_[combined_hash % bits_.size()]){
+        size_t bit_pos = combined_hash % num_bits;
+        if ((bits_[bit_pos / 8] & (1 << (bit_pos % 8))) == 0) {
             return false;
         }
     }
 
-    return true; // Might exists
+    return true; // Might exist
 }
 
 std::vector<uint8_t> BloomFilter::serialize() const {
-    // We need 1 byte to store the number of hashes, plus enough bytes to hold all our bits
-    size_t num_bytes = (bits_.size() + 7) / 8; // Ceiling division
-    std::vector<uint8_t> buffer(1 + num_bytes, 0);
+    // With std::vector<uint8_t>, serialization is much simpler.
+    // We just need to prepend the num_hashes_ byte.
+    std::vector<uint8_t> buffer(1 + bits_.size());
 
     // Store the number of hashes in the very first byte
     buffer[0] = num_hashes_;
-
-    // Pack the boolean bits into actual 8-bit bytes
-    for (size_t i = 0; i < bits_.size(); i++) {
-        if (bits_[i]) {
-            buffer[1 + (i / 8)] |= (1 << (i % 8)); // Bitwise OR to flip the specific bit ON
-        }
-    }
+    std::copy(bits_.begin(), bits_.end(), buffer.begin() + 1);
     return buffer;
 }
 
@@ -109,13 +93,8 @@ void BloomFilter::deserialize(const std::vector<uint8_t>& data) {
     // Read the number of hashes
     num_hashes_ = data[0];
 
-    // Unpack the bytes back into the std::vector<bool>
-    size_t num_bits = (data.size() - 1) * 8;
-    bits_.resize(num_bits, false);
-
-    for (size_t i = 0; i < num_bits; i++) {
-        bits_[i] = (data[1 + (i / 8)] & (1 << (i % 8))) != 0;
-    }
+    // The rest of the data is our bit vector.
+    bits_.assign(data.begin() + 1, data.end());
 }
 
 }; // Namespace LSm

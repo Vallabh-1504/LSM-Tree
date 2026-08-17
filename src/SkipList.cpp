@@ -5,8 +5,13 @@
 
 namespace LSM {
 
-SkipList::SkipList(int max_level, float probability) : max_level(max_level), probability(probability), current_level(0), rng_(std::random_device{}()){
-    head = new SkipListNode("", "", max_level, false);
+SkipList::SkipList(int max_level, float probability)
+    : max_level(max_level), 
+    probability(probability), 
+    current_level(0),
+    rng_(std::random_device{}())
+    {
+        head = new SkipListNode("", "", max_level, false);
 }
 
 SkipList::~SkipList(){
@@ -18,6 +23,7 @@ SkipList::~SkipList(){
         current = next;
     }
 }
+
 int SkipList::randomLevel(){
     // Generate a perfect random
     std::uniform_real_distribution<float> dis(0.0f, 1.0f);
@@ -29,7 +35,7 @@ int SkipList::randomLevel(){
     return lvl;
 }
 
-std::optional<std::string> SkipList::get(const std::string &key) const{
+std::optional<std::string> SkipList::get(const std::string &key) const {
     SkipListNode* current = head;
 
     // Start from highest active level and move right, then drop down
@@ -102,8 +108,6 @@ void SkipList::remove(const std::string& key){
 }
 
 void SkipList::print() const {
-    // std::cout << "\n--- Skip List Contents --\n";
-
     for(int i = current_level; i >= 0; i--){
         SkipListNode* current = head->forward[i];
         // std::cout << "Level " << i << ": ";
@@ -114,7 +118,6 @@ void SkipList::print() const {
         }
         // std::cout << "\n";
     }
-    // std::cout << "------------------------\n";
 }
 
 std::vector<FlushedEntry> SkipList::flushAll() const {

@@ -6,6 +6,7 @@ namespace LSM {
 
 WAL::WAL(const std::string &path) : log_path(path){
     // Create file in binary mode (binary mode stops OS from modifying line endings)
+    // Create file in append mode (so, appends are at end of file- sequential I/O)
     out_stream.open(log_path, std::ios::app | std::ios::binary);
     if(!out_stream.is_open()){
         std::cerr << "Failed to open WAL file: " << log_path << "\n";
